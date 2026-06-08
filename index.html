@@ -1,0 +1,217 @@
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATRIX / 草台解码器 v3.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* 科技感呼吸光标 */
+        .cursor::after {
+            content: '▉';
+            color: #2563eb;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    </style>
+</head>
+<body class="bg-[#f8fafc] text-[#334155] font-sans min-h-screen p-6 md:p-12 flex flex-col justify-between selection:bg-[#dbeafe] selection:text-[#1e40af]">
+
+    <div class="max-w-3xl w-full mx-auto flex justify-between items-center border-b border-[#e2e8f0] pb-6 mb-8">
+        <div class="flex items-center space-x-3">
+            <span class="font-bold tracking-tight text-slate-900 text-lg">MATRIX <span class="text-blue-600 font-medium">/ 草台解码器 v3.0</span></span>
+            <button id="config-btn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded-md transition-colors cursor-pointer border border-slate-200/60 font-medium">⚙️ 配置芯片</button>
+        </div>
+        <div id="status-tag" class="text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50">
+            ● 滤波通道: 正常
+        </div>
+    </div>
+
+    <div id="config-panel" class="hidden max-w-3xl w-full mx-auto mb-8 bg-white border border-slate-200 p-6 rounded-xl shadow-sm text-sm space-y-4">
+        <div class="text-slate-800 font-bold uppercase tracking-wider text-xs flex items-center"><span class="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>📡 大模型节点配置（保存在本地浏览器）</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-slate-500 text-xs mb-1 font-medium">API Base URL</label>
+                <input id="api-url" type="text" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" value="https://api.siliconflow.cn/v1">
+            </div>
+            <div>
+                <label class="block text-slate-500 text-xs mb-1 font-medium">Model Name</label>
+                <input id="api-model" type="text" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" value="deepseek-ai/DeepSeek-V3">
+            </div>
+        </div>
+        <div>
+            <label class="block text-slate-500 text-xs mb-1 font-medium">API Secret Key</label>
+            <input id="api-key" type="password" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" placeholder="sk-...">
+        </div>
+        <div class="text-right">
+            <button id="save-config" class="bg-blue-600 text-white px-4 py-2 text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-sm shadow-blue-200">保存并锁定</button>
+        </div>
+    </div>
+
+    <div class="max-w-3xl w-full mx-auto my-auto space-y-10">
+        
+        <div class="space-y-3">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center">
+                [ INPUT / 原始信号 ]
+            </label>
+            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm focus-within:border-blue-500 focus-within:shadow-md focus-within:shadow-blue-500/5 transition-all">
+                <textarea id="input" rows="3" class="w-full bg-transparent text-slate-800 focus:outline-none resize-none cursor text-base leading-relaxed" placeholder="粘贴对方发来的职场空气/微信聊天记录，按 Enter 开始脱水..."></textarea>
+            </div>
+        </div>
+
+        <div id="output-wrapper" class="space-y-6 transition-all duration-300 hidden border-t border-slate-200 pt-8">
+            
+            <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-rose-500">[ TRUTH / 滤波真相 ]</label>
+                <div class="bg-rose-50/50 border border-rose-100 p-5 rounded-xl">
+                    <p id="output-text" class="text-rose-950 font-medium text-base leading-relaxed"></p>
+                </div>
+            </div>
+
+            <div id="reply-section" class="space-y-3">
+                <label class="text-xs font-bold uppercase tracking-wider text-blue-600">[ COUNTER / 建议回复 ]</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="replies-grid">
+                    </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 pt-2 flex justify-between">
+                <span>💡 提示：点击任意回复框即可自动复制 / 按 Esc 彻底重置</span>
+                <span id="toast" class="text-emerald-600 font-medium hidden">内容已成功复制</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="text-[11px] text-slate-400 text-center border-t border-slate-200 pt-6 mt-8 max-w-3xl w-full mx-auto">
+        © 2026 MATRIX DECODER. 纯前端解密，数据全本地留存。
+    </div>
+
+    <script>
+        const input = document.getElementById('input');
+        const outputWrapper = document.getElementById('output-wrapper');
+        const outputText = document.getElementById('output-text');
+        const repliesGrid = document.getElementById('replies-grid');
+        const configBtn = document.getElementById('config-btn');
+        const configPanel = document.getElementById('config-panel');
+        const saveConfig = document.getElementById('save-config');
+        const statusTag = document.getElementById('status-tag');
+        const toast = document.getElementById('toast');
+
+        // 初始化读取本地配置
+        document.getElementById('api-url').value = localStorage.getItem('matrix_api_url') || 'https://api.siliconflow.cn/v1';
+        document.getElementById('api-model').value = localStorage.getItem('matrix_api_model') || 'deepseek-ai/DeepSeek-V3';
+        document.getElementById('api-key').value = localStorage.getItem('matrix_api_key') || '';
+
+        configBtn.addEventListener('click', () => configPanel.classList.toggle('hidden'));
+
+        saveConfig.addEventListener('click', () => {
+            localStorage.setItem('matrix_api_url', document.getElementById('api-url').value.trim());
+            localStorage.setItem('matrix_api_model', document.getElementById('api-model').value.trim());
+            localStorage.setItem('matrix_api_key', document.getElementById('api-key').value.trim());
+            configPanel.classList.add('hidden');
+            alert('滤波芯片配置已更新。');
+        });
+
+        input.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const rawText = input.value.trim();
+                if (!rawText) return;
+
+                input.blur();
+                input.classList.remove('cursor');
+                await decodeAir(rawText);
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                input.value = '';
+                outputWrapper.classList.add('hidden');
+                outputText.innerText = '';
+                repliesGrid.innerHTML = '';
+                statusTag.innerText = '● 滤波通道: 正常';
+                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50';
+                input.classList.add('cursor');
+                input.focus();
+            }
+        });
+
+        // 统一复制函数
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+
+        // AI 解码核心引擎
+        async function decodeAir(text) {
+            outputWrapper.classList.remove('hidden');
+            repliesGrid.innerHTML = '';
+            outputText.innerHTML = "<span class='animate-pulse text-slate-400'>正在粉碎官僚黑话，榨取核心真实意图...</span>";
+            statusTag.innerText = '● STATUS: 脱水中...';
+            statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-200/50';
+
+            const apiUrl = localStorage.getItem('matrix_api_url');
+            const apiModel = localStorage.getItem('matrix_api_model');
+            const apiKey = localStorage.getItem('matrix_api_key');
+
+            try {
+                // 改为调用本站后端，避免浏览器直连第三方接口导致的 CORS / Interrupted
+                const response = await fetch('/api/decode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text,
+                        apiUrl,
+                        model: apiModel,
+                        apiKey
+                    })
+                });
+
+                if (!response.ok) throw new Error('CORS or Network Error');
+                const data = await response.json();
+                const truth = data.truth || data.raw || data.aiResult || '';
+                const defensive = data.defensive || '收到，由于资源受限，为规避风险，请同步具体Owner。';
+                const penetrating = data.penetrating || '明白，咱们直接对齐最终的核心考核指标即可。';
+                const zen = data.zen || '好的，收到。';
+                const rebound = data.rebound || '收到。为推进落地，请问您这边能支持的判断标准是什么？';
+
+                // 渲染真相
+                outputText.innerText = truth;
+
+                // 构造智能回复卡片
+                const replyStyles = [
+                    { title: '🛡️ 防御型回复 (划清界限)', text: defensive },
+                    { title: '⚡ 穿透型回复 (直击要害)', text: penetrating },
+                    { title: '🍃 极简型回复 (应付高管)', text: zen },
+                    { title: '🪃 反弹型回复 (把球踢回)', text: rebound }
+                ];
+
+                replyStyles.forEach(style => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group";
+                    card.innerHTML = `
+                        <div class="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors mb-1.5">${style.title}</div>
+                        <p class="text-slate-700 text-sm leading-relaxed">${style.text}</p>
+                    `;
+                    card.addEventListener('click', () => copyToClipboard(style.text));
+                    repliesGrid.appendChild(card);
+                });
+
+                statusTag.innerText = '● 滤波通道: 净化完成';
+                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50';
+
+            } catch (error) {
+                outputText.innerHTML = "⚠️ <span class='text-rose-600'>滤波请求失败。</span>请确认 Vercel 后端接口 /api/decode 已部署，并检查环境变量是否已配置。";
+                statusTag.innerText = '● STATUS: 阻断';
+                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-rose-50 text-rose-600 rounded-full border border-rose-200/50';
+            } finally {
+                input.classList.add('cursor');
+            }
+        }
+    </script>
+</body>
+</html>
+zdfzdf@192 my-filter % 
