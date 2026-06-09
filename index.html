@@ -1,217 +1,687 @@
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MATRIX / 草台解码器 v3.0</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style>
-        /* 科技感呼吸光标 */
-        .cursor::after {
-            content: '▉';
-            color: #2563eb;
-            animation: blink 1s infinite;
-        }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>草台解码器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --panel: rgba(255, 255, 255, 0.82);
+      --panel-strong: #ffffff;
+      --line: #d9dee8;
+      --line-strong: #c8d2e1;
+      --text: #243041;
+      --muted: #667085;
+      --subtle: #98a2b3;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.08);
+      --success: #0f9d58;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 24%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    ::selection {
+      background: rgba(37, 99, 235, 0.16);
+    }
+
+    .shell {
+      max-width: 760px;
+      margin: 0 auto;
+      min-height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .topbar, .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .topbar {
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(201, 210, 223, 0.75);
+    }
+
+    .footer {
+      padding-top: 14px;
+      border-top: 1px solid rgba(201, 210, 223, 0.75);
+      justify-content: center;
+      color: var(--subtle);
+    }
+
+    .brand {
+      color: var(--text);
+      font-weight: 600;
+      letter-spacing: 0.12em;
+    }
+
+    .status {
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(201, 210, 223, 0.78);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .composer {
+      padding: 24px;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .label {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 26px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(37, 99, 235, 0.16);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .textarea-wrap {
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel-strong);
+      color: var(--text);
+      padding: 18px 18px 18px 18px;
+      font: inherit;
+      font-size: 15px;
+      line-height: 1.75;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    textarea::placeholder {
+      color: #9aa5b1;
+    }
+
+    textarea:focus {
+      border-color: var(--line-strong);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--muted);
+    }
+
+    .result {
+      padding: 22px 24px 24px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(201, 210, 223, 0.78);
+    }
+
+    .result-title {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .result-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .result-item {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(201, 210, 223, 0.8);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+
+    .result-key {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .result-value {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--text);
+    }
+
+    .meter {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(201, 210, 223, 0.8);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,251,0.98));
+    }
+
+    .meter-left {
+      display: grid;
+      gap: 4px;
+    }
+
+    .meter-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .meter-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .meter-number {
+      font-size: 38px;
+      line-height: 1;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+    }
+
+    .bar {
+      margin-top: 12px;
+      height: 10px;
+      border-radius: 999px;
+      background: #e8edf5;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      width: 64%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #60a5fa 0%, #2563eb 52%, #7c3aed 100%);
+      transition: width 0.3s ease;
+    }
+
+    .empty {
+      padding: 20px 16px;
+      border-radius: 16px;
+      border: 1px dashed rgba(151, 162, 179, 0.5);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.65);
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .loading {
+      color: var(--subtle);
+      font-style: italic;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 12px;
+      }
+
+      .shell {
+        min-height: calc(100vh - 24px);
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .composer,
+      .result {
+        padding: 18px;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .meter {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
-<body class="bg-[#f8fafc] text-[#334155] font-sans min-h-screen p-6 md:p-12 flex flex-col justify-between selection:bg-[#dbeafe] selection:text-[#1e40af]">
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">草台解码器</div>
+      <div class="status">● READY</div>
+    </header>
 
-    <div class="max-w-3xl w-full mx-auto flex justify-between items-center border-b border-[#e2e8f0] pb-6 mb-8">
-        <div class="flex items-center space-x-3">
-            <span class="font-bold tracking-tight text-slate-900 text-lg">MATRIX <span class="text-blue-600 font-medium">/ 草台解码器 v3.0</span></span>
-            <button id="config-btn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded-md transition-colors cursor-pointer border border-slate-200/60 font-medium">⚙️ 配置芯片</button>
-        </div>
-        <div id="status-tag" class="text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50">
-            ● 滤波通道: 正常
-        </div>
-    </div>
+    <section class="card composer">
+      <div class="label-row">
+        <div class="label">贴入你的对话 / 职场话术 / 聊天记录</div>
+        <div id="status" class="badge">待解码</div>
+      </div>
 
-    <div id="config-panel" class="hidden max-w-3xl w-full mx-auto mb-8 bg-white border border-slate-200 p-6 rounded-xl shadow-sm text-sm space-y-4">
-        <div class="text-slate-800 font-bold uppercase tracking-wider text-xs flex items-center"><span class="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>📡 大模型节点配置（保存在本地浏览器）</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-slate-500 text-xs mb-1 font-medium">API Base URL</label>
-                <input id="api-url" type="text" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" value="https://api.siliconflow.cn/v1">
+      <div class="textarea-wrap">
+        <textarea
+          id="input"
+          placeholder="把你自己的对话粘贴到这里。比如领导、同事、客户说的话，或者一段聊天截图转文字。"
+        ></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="decodeBtn" class="btn primary">解码</button>
+        <button id="resetBtn" class="btn">清空</button>
+        <button id="copyBtn" class="btn">复制结果</button>
+      </div>
+
+      <div class="hint">
+        直接贴你的真实内容就行，不需要看示例。按 <strong>Enter</strong> 解码，<strong>Esc</strong> 清空，双击结果卡可以复制。
+      </div>
+    </section>
+
+    <section class="card result">
+      <div class="result-head">
+        <div class="result-title">输出</div>
+        <div id="riskBadge" class="badge">等待输入</div>
+      </div>
+
+      <div id="emptyState" class="empty">
+        这里会显示解码结果。把你自己的对话贴进去，页面会直接给你看：
+        <br />表面意思、潜台词、建议回复、风险等级。
+      </div>
+
+      <div id="outputPanel" class="hidden">
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-key">表面意思</div>
+            <div id="surfaceText" class="result-value"></div>
+          </div>
+
+          <div class="result-item">
+            <div class="result-key">潜台词</div>
+            <div id="subtext" class="result-value"></div>
+          </div>
+
+          <div class="result-item">
+            <div class="result-key">建议回复</div>
+            <div id="replyText" class="result-value"></div>
+          </div>
+
+          <div class="meter">
+            <div class="meter-left">
+              <div class="result-key" style="margin:0;">风险等级</div>
+              <div id="riskText" class="meter-label">-</div>
+              <div id="airState" class="meter-sub">平静</div>
             </div>
-            <div>
-                <label class="block text-slate-500 text-xs mb-1 font-medium">Model Name</label>
-                <input id="api-model" type="text" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" value="deepseek-ai/DeepSeek-V3">
+            <div style="text-align:right;">
+              <div class="result-key" style="margin:0 0 6px;">空气指数</div>
+              <div id="airIndex" class="meter-number">67</div>
             </div>
+          </div>
         </div>
-        <div>
-            <label class="block text-slate-500 text-xs mb-1 font-medium">API Secret Key</label>
-            <input id="api-key" type="password" class="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 focus:outline-none focus:border-blue-500 transition-colors" placeholder="sk-...">
-        </div>
-        <div class="text-right">
-            <button id="save-config" class="bg-blue-600 text-white px-4 py-2 text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-sm shadow-blue-200">保存并锁定</button>
-        </div>
-    </div>
+      </div>
 
-    <div class="max-w-3xl w-full mx-auto my-auto space-y-10">
-        
-        <div class="space-y-3">
-            <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center">
-                [ INPUT / 原始信号 ]
-            </label>
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm focus-within:border-blue-500 focus-within:shadow-md focus-within:shadow-blue-500/5 transition-all">
-                <textarea id="input" rows="3" class="w-full bg-transparent text-slate-800 focus:outline-none resize-none cursor text-base leading-relaxed" placeholder="粘贴对方发来的职场空气/微信聊天记录，按 Enter 开始脱水..."></textarea>
-            </div>
-        </div>
+      <div class="bar" aria-hidden="true">
+        <div id="airBar" class="fill"></div>
+      </div>
+    </section>
 
-        <div id="output-wrapper" class="space-y-6 transition-all duration-300 hidden border-t border-slate-200 pt-8">
-            
-            <div class="space-y-2">
-                <label class="text-xs font-bold uppercase tracking-wider text-rose-500">[ TRUTH / 滤波真相 ]</label>
-                <div class="bg-rose-50/50 border border-rose-100 p-5 rounded-xl">
-                    <p id="output-text" class="text-rose-950 font-medium text-base leading-relaxed"></p>
-                </div>
-            </div>
+    <footer class="footer">© 2026 都是空气，但不完全是废话</footer>
+  </main>
 
-            <div id="reply-section" class="space-y-3">
-                <label class="text-xs font-bold uppercase tracking-wider text-blue-600">[ COUNTER / 建议回复 ]</label>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="replies-grid">
-                    </div>
-            </div>
+  <script>
+    const input = document.getElementById('input');
+    const decodeBtn = document.getElementById('decodeBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const statusEl = document.getElementById('status');
+    const riskBadge = document.getElementById('riskBadge');
+    const emptyState = document.getElementById('emptyState');
+    const outputPanel = document.getElementById('outputPanel');
+    const surfaceText = document.getElementById('surfaceText');
+    const subtext = document.getElementById('subtext');
+    const replyText = document.getElementById('replyText');
+    const riskText = document.getElementById('riskText');
+    const airState = document.getElementById('airState');
+    const airIndex = document.getElementById('airIndex');
+    const airBar = document.getElementById('airBar');
 
-            <div class="text-[11px] text-slate-400 pt-2 flex justify-between">
-                <span>💡 提示：点击任意回复框即可自动复制 / 按 Esc 彻底重置</span>
-                <span id="toast" class="text-emerald-600 font-medium hidden">内容已成功复制</span>
-            </div>
-        </div>
+    const defaultEmptyHtml = `这里会显示解码结果。把你自己的对话贴进去，页面会直接给你看：
+        <br />表面意思、潜台词、建议回复、风险等级。`;
 
-    </div>
+    let currentResult = null;
 
-    <div class="text-[11px] text-slate-400 text-center border-t border-slate-200 pt-6 mt-8 max-w-3xl w-full mx-auto">
-        © 2026 MATRIX DECODER. 纯前端解密，数据全本地留存。
-    </div>
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
 
-    <script>
-        const input = document.getElementById('input');
-        const outputWrapper = document.getElementById('output-wrapper');
-        const outputText = document.getElementById('output-text');
-        const repliesGrid = document.getElementById('replies-grid');
-        const configBtn = document.getElementById('config-btn');
-        const configPanel = document.getElementById('config-panel');
-        const saveConfig = document.getElementById('save-config');
-        const statusTag = document.getElementById('status-tag');
-        const toast = document.getElementById('toast');
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[char]);
+    }
 
-        // 初始化读取本地配置
-        document.getElementById('api-url').value = localStorage.getItem('matrix_api_url') || 'https://api.siliconflow.cn/v1';
-        document.getElementById('api-model').value = localStorage.getItem('matrix_api_model') || 'deepseek-ai/DeepSeek-V3';
-        document.getElementById('api-key').value = localStorage.getItem('matrix_api_key') || '';
+    function setStatus(text, tone = 'ready') {
+      statusEl.textContent = text;
+      statusEl.style.borderColor = 'rgba(201, 210, 223, 0.9)';
+      statusEl.style.background = 'var(--accent-soft)';
+      if (tone === 'loading') {
+        statusEl.style.color = 'var(--warn)';
+      } else if (tone === 'danger') {
+        statusEl.style.color = 'var(--danger)';
+      } else {
+        statusEl.style.color = 'var(--accent)';
+      }
+    }
 
-        configBtn.addEventListener('click', () => configPanel.classList.toggle('hidden'));
+    function riskFromScore(score) {
+      if (score < 30) return '低';
+      if (score < 55) return '中';
+      if (score < 75) return '中高';
+      return '高';
+    }
 
-        saveConfig.addEventListener('click', () => {
-            localStorage.setItem('matrix_api_url', document.getElementById('api-url').value.trim());
-            localStorage.setItem('matrix_api_model', document.getElementById('api-model').value.trim());
-            localStorage.setItem('matrix_api_key', document.getElementById('api-key').value.trim());
-            configPanel.classList.add('hidden');
-            alert('滤波芯片配置已更新。');
-        });
+    function stateFromScore(score) {
+      if (score < 30) return '平静';
+      if (score < 55) return '有点意思';
+      if (score < 75) return '暗流涌动';
+      return '谁碰谁死';
+    }
 
-        input.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                const rawText = input.value.trim();
-                if (!rawText) return;
+    function scoreFromRisk(risk) {
+      switch (risk) {
+        case '低':
+          return 24;
+        case '中':
+          return 49;
+        case '中高':
+          return 68;
+        case '高':
+          return 87;
+        default:
+          return 49;
+      }
+    }
 
-                input.blur();
-                input.classList.remove('cursor');
-                await decodeAir(rawText);
-            }
-        });
+    function normalizeText(value, fallback) {
+      const text = String(value ?? '').trim();
+      return text || String(fallback ?? '').trim();
+    }
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                input.value = '';
-                outputWrapper.classList.add('hidden');
-                outputText.innerText = '';
-                repliesGrid.innerHTML = '';
-                statusTag.innerText = '● 滤波通道: 正常';
-                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50';
-                input.classList.add('cursor');
-                input.focus();
-            }
-        });
+    function renderEmpty() {
+      currentResult = null;
+      emptyState.classList.remove('hidden');
+      emptyState.innerHTML = defaultEmptyHtml;
+      outputPanel.classList.add('hidden');
+      riskBadge.textContent = '等待输入';
+      riskText.textContent = '-';
+      airState.textContent = '平静';
+      airIndex.textContent = '67';
+      airBar.style.width = '67%';
+      setStatus('待解码', 'ready');
+    }
 
-        // 统一复制函数
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 2000);
-        }
+    function renderLoading() {
+      currentResult = null;
+      emptyState.classList.add('hidden');
+      outputPanel.classList.remove('hidden');
+      surfaceText.innerHTML = "<span class='loading'>解析中...</span>";
+      subtext.innerHTML = "<span class='loading'>读取潜台词...</span>";
+      replyText.innerHTML = "<span class='loading'>生成回复...</span>";
+      riskText.textContent = '...';
+      airState.textContent = '读取中';
+      airIndex.textContent = '...';
+      riskBadge.textContent = '扫描中';
+      airBar.style.width = '12%';
+      setStatus('解码中', 'loading');
+    }
 
-        // AI 解码核心引擎
-        async function decodeAir(text) {
-            outputWrapper.classList.remove('hidden');
-            repliesGrid.innerHTML = '';
-            outputText.innerHTML = "<span class='animate-pulse text-slate-400'>正在粉碎官僚黑话，榨取核心真实意图...</span>";
-            statusTag.innerText = '● STATUS: 脱水中...';
-            statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-200/50';
+    function renderError(message) {
+      currentResult = null;
+      outputPanel.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      emptyState.innerHTML = `⚠️ <strong>解码失败。</strong><br />${escapeHtml(message)}`;
+      riskBadge.textContent = '失败';
+      riskText.textContent = '-';
+      airState.textContent = '未完成';
+      airIndex.textContent = '--';
+      airBar.style.width = '0%';
+      setStatus('失败', 'danger');
+    }
 
-            const apiUrl = localStorage.getItem('matrix_api_url');
-            const apiModel = localStorage.getItem('matrix_api_model');
-            const apiKey = localStorage.getItem('matrix_api_key');
+    function renderResult(data) {
+      const surface = normalizeText(data.surface || data.truth || data.raw, '表面意思待生成');
+      const sub = normalizeText(data.subtext || data.penetrating || data.defensive || data.raw, '潜台词待生成');
+      const reply = normalizeText(data.reply || data.zen || data.rebound || data.defensive, '建议回复待生成');
+      const rawRisk = normalizeText(data.risk, '');
+      const parsedScore = Number(data.airIndex);
+      const score = clamp(
+        Number.isFinite(parsedScore) ? Math.round(parsedScore) : scoreFromRisk(rawRisk || '中'),
+        0,
+        100
+      );
+      const risk = ['低', '中', '中高', '高'].includes(rawRisk) ? rawRisk : riskFromScore(score);
+      const state = normalizeText(data.airState, stateFromScore(score));
 
-            try {
-                // 改为调用本站后端，避免浏览器直连第三方接口导致的 CORS / Interrupted
-                const response = await fetch('/api/decode', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        text,
-                        apiUrl,
-                        model: apiModel,
-                        apiKey
-                    })
-                });
+      currentResult = { surface, sub, reply, risk, score, state };
 
-                if (!response.ok) throw new Error('CORS or Network Error');
-                const data = await response.json();
-                const truth = data.truth || data.raw || data.aiResult || '';
-                const defensive = data.defensive || '收到，由于资源受限，为规避风险，请同步具体Owner。';
-                const penetrating = data.penetrating || '明白，咱们直接对齐最终的核心考核指标即可。';
-                const zen = data.zen || '好的，收到。';
-                const rebound = data.rebound || '收到。为推进落地，请问您这边能支持的判断标准是什么？';
+      emptyState.classList.add('hidden');
+      outputPanel.classList.remove('hidden');
+      surfaceText.textContent = surface;
+      subtext.textContent = sub;
+      replyText.textContent = reply;
+      riskText.textContent = risk;
+      airState.textContent = state;
+      airIndex.textContent = String(score);
+      riskBadge.textContent = risk;
+      airBar.style.width = `${score}%`;
+      setStatus('已解码', risk === '高' ? 'danger' : 'ready');
+    }
 
-                // 渲染真相
-                outputText.innerText = truth;
+    async function decodeWithApi(text) {
+      const response = await fetch('/api/decode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+      });
 
-                // 构造智能回复卡片
-                const replyStyles = [
-                    { title: '🛡️ 防御型回复 (划清界限)', text: defensive },
-                    { title: '⚡ 穿透型回复 (直击要害)', text: penetrating },
-                    { title: '🍃 极简型回复 (应付高管)', text: zen },
-                    { title: '🪃 反弹型回复 (把球踢回)', text: rebound }
-                ];
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
 
-                replyStyles.forEach(style => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group";
-                    card.innerHTML = `
-                        <div class="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors mb-1.5">${style.title}</div>
-                        <p class="text-slate-700 text-sm leading-relaxed">${style.text}</p>
-                    `;
-                    card.addEventListener('click', () => copyToClipboard(style.text));
-                    repliesGrid.appendChild(card);
-                });
+      if (!response.ok) {
+        throw new Error(payload.error || payload.details || `请求失败：${response.status}`);
+      }
 
-                statusTag.innerText = '● 滤波通道: 净化完成';
-                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-200/50';
+      return payload;
+    }
 
-            } catch (error) {
-                outputText.innerHTML = "⚠️ <span class='text-rose-600'>滤波请求失败。</span>请确认 Vercel 后端接口 /api/decode 已部署，并检查环境变量是否已配置。";
-                statusTag.innerText = '● STATUS: 阻断';
-                statusTag.className = 'text-xs font-semibold px-2.5 py-1 bg-rose-50 text-rose-600 rounded-full border border-rose-200/50';
-            } finally {
-                input.classList.add('cursor');
-            }
-        }
-    </script>
+    function payloadText() {
+      if (!currentResult) return '';
+      return [
+        `表面意思：${currentResult.surface}`,
+        `潜台词：${currentResult.sub}`,
+        `建议回复：${currentResult.reply}`,
+        `风险等级：${currentResult.risk}`
+      ].join('\n');
+    }
+
+    async function handleDecode() {
+      const text = input.value.trim();
+      if (!text) {
+        renderEmpty();
+        input.focus();
+        return;
+      }
+
+      renderLoading();
+
+      try {
+        const data = await decodeWithApi(text);
+        renderResult(data);
+      } catch (error) {
+        renderError(error?.message || '未知错误');
+      }
+    }
+
+    decodeBtn.addEventListener('click', handleDecode);
+
+    resetBtn.addEventListener('click', () => {
+      input.value = '';
+      renderEmpty();
+      input.focus();
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      if (!currentResult) return;
+      try {
+        await navigator.clipboard.writeText(payloadText());
+        setStatus('已复制', 'ready');
+      } catch {
+        setStatus('复制失败', 'danger');
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleDecode();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        input.value = '';
+        renderEmpty();
+      }
+    });
+
+    outputPanel.addEventListener('dblclick', async () => {
+      if (!currentResult) return;
+
+      try {
+        await navigator.clipboard.writeText(payloadText());
+        setStatus('已复制', 'ready');
+        alert('结果已复制。');
+      } catch {
+        setStatus('复制失败', 'danger');
+      }
+    });
+
+    renderEmpty();
+    input.focus();
+  </script>
 </body>
 </html>
-zdfzdf@192 my-filter % 
