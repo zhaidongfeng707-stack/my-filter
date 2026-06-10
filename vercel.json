@@ -1,16 +1,1 @@
-{
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs20.x"
-    },
-    "API/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/API/:path*",
-      "destination": "/api/:path*"
-    }
-  ]
-}
+{}
