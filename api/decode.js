@@ -67,6 +67,91 @@ function inferScoreFromRisk(risk) {
   }
 }
 
+function localDecode(text, reason) {
+  const source = normalizeString(text, '这句话没有给出具体内容');
+  const compact = source.replace(/\s+/g, '');
+  let score = 38;
+  let surface = '对方在表达一个不太明确的态度。';
+  let subtext = '信息不够满，但这句话大概率是在给自己留余地。';
+  let reply = '我理解，我先确认一下边界和下一步。';
+
+  const rules = [
+    {
+      test: /原则上|理论上|按理说|正常来说/,
+      score: 18,
+      surface: '对方没有把话说死。',
+      subtext: '真实态度偏拒绝，但还想保留体面空间。',
+      reply: '明白，那我先确认可行边界和替代方案。'
+    },
+    {
+      test: /不行|不方便|不太合适|不建议|不能|不想/,
+      score: 22,
+      surface: '对方倾向于拒绝。',
+      subtext: '这不是单纯讨论方案，而是在给你降预期。',
+      reply: '收到，我先按不可行处理，同时补一个备选方案。'
+    },
+    {
+      test: /推进|跟进|拉通|对齐|闭环|落地/,
+      score: 14,
+      surface: '对方希望你继续往前推。',
+      subtext: '事情还没完全清楚，但责任已经开始往你这边移动。',
+      reply: '可以，我先拉一下关键节点和负责人。'
+    },
+    {
+      test: /辛苦|麻烦|支持一下|帮忙|协助/,
+      score: 12,
+      surface: '对方在客气地分配任务。',
+      subtext: '礼貌是真的，活也是真的，大概率还不会少。',
+      reply: '可以，我先看下优先级和交付时间。'
+    },
+    {
+      test: /尽快|今天|马上|立刻|下班前|抓紧/,
+      score: 18,
+      surface: '对方在催进度。',
+      subtext: '时间压力已经传过来了，后面可能会追责。',
+      reply: '我先处理优先项，预计时间我稍后同步。'
+    },
+    {
+      test: /你自己把握|看着办|灵活处理|自行判断/,
+      score: 20,
+      surface: '对方把判断权交给你。',
+      subtext: '听起来给空间，实际上也把风险一起给了你。',
+      reply: '可以，我按这个方向走，关键决策点会提前同步。'
+    },
+    {
+      test: /老板|领导|客户|上面|总部/,
+      score: 12,
+      surface: '这句话背后有更高层压力。',
+      subtext: '对方可能不是在和你商量，而是在传递上游压力。',
+      reply: '收到，我先按优先事项处理，并同步风险点。'
+    }
+  ];
+
+  for (const rule of rules) {
+    if (rule.test.test(compact)) {
+      score += rule.score;
+      surface = rule.surface;
+      subtext = rule.subtext;
+      reply = rule.reply;
+    }
+  }
+
+  score = clamp(score, 18, 92);
+  const risk = normalizeRisk('', score);
+
+  return {
+    surface,
+    subtext,
+    reply,
+    risk,
+    airIndex: score,
+    airState: normalizeAirState('', score),
+    raw: source,
+    fallback: true,
+    fallbackReason: reason || 'AI upstream unavailable'
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -86,10 +171,7 @@ module.exports = async function handler(req, res) {
     const apiKey = String(body.apiKey || process.env.SILICONFLOW_API_KEY || '').trim();
 
     if (!apiKey) {
-      return res.status(500).json({
-        error: 'Missing API key',
-        hint: 'Set SILICONFLOW_API_KEY in Vercel env vars, or pass apiKey for local testing.'
-      });
+      return res.status(200).json(localDecode(text, 'Missing API key'));
     }
 
     const response = await fetch(`${apiUrl}/chat/completions`, {
@@ -130,10 +212,7 @@ JSON 字段必须是：
     const rawText = await response.text();
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: 'Upstream request failed',
-        details: rawText
-      });
+      return res.status(200).json(localDecode(text, `Upstream request failed: ${response.status}`));
     }
 
     const data = safeJsonParse(rawText);
@@ -172,9 +251,6 @@ JSON 字段必须是：
       model
     });
   } catch (error) {
-    return res.status(500).json({
-      error: 'Server error',
-      details: error?.message || String(error)
-    });
+    return res.status(200).json(localDecode('', error?.message || String(error)));
   }
 };
