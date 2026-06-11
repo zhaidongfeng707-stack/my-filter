@@ -1,5 +1,10 @@
 const DEFAULT_API_URL = 'https://api.siliconflow.cn/v1';
-const DEFAULT_MODEL = 'deepseek-ai/DeepSeek-V3';
+const DEFAULT_MODEL = 'deepseek-ai/DeepSeek-V3.2';
+const FALLBACK_MODELS = [
+  'deepseek-ai/DeepSeek-V3.2',
+  'deepseek-ai/DeepSeek-V3.1-Terminus',
+  'Qwen/Qwen2.5-7B-Instruct'
+];
 
 function cleanUrl(url) {
   return String(url || '').trim().replace(/\/+$/, '');
@@ -65,6 +70,28 @@ function inferScoreFromRisk(risk) {
     default:
       return 49;
   }
+}
+
+function uniqueModels(primary) {
+  return [primary, ...FALLBACK_MODELS]
+    .map((model) => String(model || '').trim())
+    .filter(Boolean)
+    .filter((model, index, models) => models.indexOf(model) === index);
+}
+
+function summarizeProviderError(status, text) {
+  const parsed = safeJsonParse(text);
+  const message =
+    parsed?.message ||
+    parsed?.error?.message ||
+    parsed?.error ||
+    parsed?.detail ||
+    String(text || '').slice(0, 240);
+
+  return {
+    status,
+    message: String(message || 'Unknown upstream error').slice(0, 240)
+  };
 }
 
 function localDecode(text, reason) {
@@ -147,9 +174,47 @@ function localDecode(text, reason) {
     airIndex: score,
     airState: normalizeAirState('', score),
     raw: source,
+    mode: 'local',
     fallback: true,
     fallbackReason: reason || 'AI upstream unavailable'
   };
+}
+
+async function requestSiliconFlow({ apiUrl, apiKey, model, text }) {
+  return fetch(`${apiUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.5,
+      messages: [
+        {
+          role: 'system',
+          content: `你是“草台解码器”的核心引擎。你要把用户输入的职场话术、群聊内容、客户话术，翻译成年轻人能直接看懂、可以直接回复的结果。
+只输出严格 JSON，不要 markdown，不要代码块，不要解释。
+JSON 字段必须是：
+{
+  "surface": "一句话概括表面意思，20字以内",
+  "subtext": "一句话点出潜台词，30字以内",
+  "reply": "一句可直接发送的建议回复，30字以内",
+  "risk": "低/中/中高/高",
+  "airIndex": 0 到 100 的整数,
+  "airState": "平静/有点意思/暗流涌动/谁碰谁死"
+}
+要求：
+- surface 必须忠实，不要夸张。
+- subtext 要点出真实意图，但不要失控。
+- reply 要礼貌、简短、实用。
+- risk 和 airIndex 要一致，空气越不对，数值越高。
+- 如果信息不足，也要给出最可能的判断。`
+        },
+        { role: 'user', content: text }
+      ]
+    })
+  });
 }
 
 module.exports = async function handler(req, res) {
@@ -174,45 +239,31 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(localDecode(text, 'Missing API key'));
     }
 
-    const response = await fetch(`${apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.5,
-        messages: [
-          {
-            role: 'system',
-            content: `你是“草台解码器”的核心引擎。你要把用户输入的职场话术、群聊内容、客户话术，翻译成年轻人能直接看懂、可以直接回复的结果。
-只输出严格 JSON，不要 markdown，不要代码块，不要解释。
-JSON 字段必须是：
-{
-  "surface": "一句话概括表面意思，20字以内",
-  "subtext": "一句话点出潜台词，30字以内",
-  "reply": "一句可直接发送的建议回复，30字以内",
-  "risk": "低/中/中高/高",
-  "airIndex": 0 到 100 的整数,
-  "airState": "平静/有点意思/暗流涌动/谁碰谁死"
-}
-要求：
-- surface 必须忠实，不要夸张。
-- subtext 要点出真实意图，但不要失控。
-- reply 要礼貌、简短、实用。
-- risk 和 airIndex 要一致，空气越不对，数值越高。
-- 如果信息不足，也要给出最可能的判断。`
-          },
-          { role: 'user', content: text }
-        ]
-      })
-    });
+    const providerErrors = [];
+    let response;
+    let rawText;
+    let activeModel;
 
-    const rawText = await response.text();
+    for (const candidate of uniqueModels(model)) {
+      activeModel = candidate;
+      response = await requestSiliconFlow({ apiUrl, apiKey, model: candidate, text });
+      rawText = await response.text();
 
-    if (!response.ok) {
-      return res.status(200).json(localDecode(text, `Upstream request failed: ${response.status}`));
+      if (response.ok) {
+        break;
+      }
+
+      providerErrors.push({
+        model: candidate,
+        ...summarizeProviderError(response.status, rawText)
+      });
+    }
+
+    if (!response?.ok) {
+      return res.status(200).json({
+        ...localDecode(text, providerErrors[0]?.message || 'All AI models unavailable'),
+        providerErrors
+      });
     }
 
     const data = safeJsonParse(rawText);
@@ -229,7 +280,9 @@ JSON 字段必须是：
         airIndex: fallbackScore,
         airState: normalizeAirState('', fallbackScore),
         raw: content || rawText,
-        model
+        mode: 'ai',
+        fallback: false,
+        model: activeModel
       });
     }
 
@@ -248,7 +301,9 @@ JSON 字段必须是：
       airIndex: score,
       airState: normalizeAirState(parsed.airState, score),
       raw: content || rawText,
-      model
+      mode: 'ai',
+      fallback: false,
+      model: activeModel
     });
   } catch (error) {
     return res.status(200).json(localDecode('', error?.message || String(error)));
