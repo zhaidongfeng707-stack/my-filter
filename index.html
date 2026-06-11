@@ -582,7 +582,7 @@
       airIndex.textContent = String(score);
       riskBadge.textContent = risk;
       airBar.style.width = `${score}%`;
-      setStatus('已解码', risk === '高' ? 'danger' : 'ready');
+      setStatus(data.mode === 'ai' ? 'AI 解码' : '本地兜底', risk === '高' ? 'danger' : 'ready');
     }
 
     async function decodeWithApi(text) {
@@ -685,4 +685,3 @@
   </script>
 </body>
 </html>
-
